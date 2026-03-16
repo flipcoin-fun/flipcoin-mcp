@@ -1,15 +1,15 @@
 # FlipCoin MCP Server
 
-MCP server for [FlipCoin](https://www.flipcoin.fun) prediction markets. Connect Claude to FlipCoin and let it browse markets, get price quotes, trade, and create markets — all through natural language.
+MCP server for [FlipCoin](https://www.flipcoin.fun) — the first agent-first prediction market platform on Base. Connect Claude to FlipCoin and let it browse markets, get price quotes, trade, and create markets through natural language.
 
 ## Quick Start (2 minutes)
 
 ### Step 1: Get an API key
 
-1. Open [flipcoin.fun/app/agents](https://www.flipcoin.fun/app/agents)
-2. Connect your wallet (MetaMask, Coinbase Wallet, or any EVM wallet)
-3. Click **"Create Agent"**, give it a name (e.g. "My Claude Agent")
-4. Click **"Generate API Key"**
+1. Go to [flipcoin.fun/agents](https://www.flipcoin.fun/agents)
+2. Connect your wallet
+3. Click **"Add Agent"** — fill in the agent name, description, and other fields
+4. Click **"Add Key"** to generate an API key
 5. Copy the key — it starts with `fc_` and is shown **only once**
 
 ### Step 2: Add to Claude
@@ -58,88 +58,110 @@ Ask Claude:
 
 > "What prediction markets are open on FlipCoin?"
 
-That's it — `list_markets`, `get_market`, `get_quote`, and `get_portfolio` work immediately with just an API key. No wallet setup needed for reading data and getting quotes.
+That's it — reading markets, getting quotes, and checking your portfolio works immediately with just an API key.
 
 ---
 
 ## Tools
 
-### Works immediately (read-only, API key only)
+### Works immediately (read-only)
 
 | Tool | Description | Example prompt |
 |------|-------------|---------------|
-| `list_markets` | Browse and search markets | "Show me crypto prediction markets sorted by volume" |
-| `get_market` | Market details: prices, trades, volume, resolution | "What's the current price on market 0xABC...?" |
+| `list_markets` | Browse and search markets (filter by status, category, sort by volume) | "Show me open crypto markets on FlipCoin" |
+| `get_market` | Market details: prices, recent trades, 24h volume, resolution status | "What's the current price on market 0xABC...?" |
 | `get_quote` | Price quote with LMSR + CLOB smart routing | "How much would it cost to buy $10 of YES shares?" |
-| `get_portfolio` | Your positions, P&L, holdings | "Show my FlipCoin portfolio" |
+| `get_portfolio` | Your positions, P&L, and holdings across all markets | "Show my FlipCoin portfolio" |
 
-### Requires trading setup (see below)
+### Requires trading setup
 
 | Tool | Description | Example prompt |
 |------|-------------|---------------|
-| `trade` | Buy or sell shares on a market | "Buy $5 of YES on the Bitcoin market" |
+| `trade` | Buy or sell shares via LMSR (instant AMM fill) | "Buy $5 of YES on the Bitcoin market" |
 | `create_market` | Create a new prediction market | "Create a market: Will ETH reach $5000 by July?" |
+
+---
+
+## Market Creation Modes
+
+FlipCoin supports two modes for creating markets:
+
+### Autonomous Mode (recommended for MCP)
+
+The API signs and submits the transaction automatically using a session key. One API call = on-chain market.
+
+**Requires**: session key setup + vault deposit (see Trading Setup below).
+
+This is the default mode for the `create_market` tool (`auto_sign: true`).
+
+### Manual Mode
+
+The API returns EIP-712 typed data that the wallet owner signs manually. Not practical for MCP since it requires interactive wallet signing.
+
+To use Manual Mode, set `auto_sign: false` in the `create_market` tool — the response will contain `typedData` for the owner to sign and relay separately.
 
 ---
 
 ## Trading Setup
 
-The `trade` and `create_market` tools execute on-chain transactions. They require three one-time setup steps from your wallet:
+To use `trade` and `create_market` in Autonomous Mode, complete these one-time steps from your wallet:
 
 ### 1. Deposit USDC to Vault
 
-Your wallet's USDC balance is separate from the FlipCoin Vault. You need to deposit funds:
+Your wallet USDC balance is separate from the FlipCoin Vault. Funds must be deposited explicitly:
 
-- Go to [flipcoin.fun/app/settings](https://www.flipcoin.fun/app/settings) or the Agents page
-- Click **"Add Funds"** — this handles USDC approval + deposit in one flow
-- For market creation, minimum deposit depends on liquidity tier:
-  - `trial`: $0 (platform-funded $50 seed)
-  - `low`: $35
-  - `medium`: $139
-  - `high`: $693
+- Go to [flipcoin.fun/agents](https://www.flipcoin.fun/agents) or [flipcoin.fun/settings](https://www.flipcoin.fun/settings)
+- Click **"Add Funds"** — handles USDC approval + deposit in one flow
+- Minimum deposit depends on liquidity tier:
+  - **trial**: $0 (platform funds a $50 seed — free first market!)
+  - **low**: $35
+  - **medium**: $139
+  - **high**: $693
 
-### 2. Create a Session Key (delegation)
+### 2. Activate Autopilot (session key + delegation)
 
-Session keys let the MCP server sign transactions on your behalf, with daily limits:
+Session keys let the MCP server sign transactions on your behalf with daily spending limits:
 
-- Go to [flipcoin.fun/app/agents](https://www.flipcoin.fun/app/agents)
-- Select your agent → **"Session Keys"** tab
-- Click **"Create Session Key"** — this sends an on-chain transaction to register delegation
+- Go to [flipcoin.fun/agents](https://www.flipcoin.fun/agents)
+- Select your agent
+- Enable **Autopilot** — this creates a session key and registers on-chain delegation via `DelegationRegistry.setDelegation()`
 - Set daily USDC limits and expiration as needed
+
+Without this step, `auto_sign: true` will fail with `DELEGATION_NOT_CONFIRMED`.
 
 ### 3. Approve Share Tokens (for selling only)
 
-If you want to sell shares, approve the trading contracts to transfer your tokens:
+If you want to sell shares, approve the trading contracts once:
 
-- **LMSR sells**: Approve BackstopRouter
-- **CLOB sells**: Approve Exchange
+- **LMSR sells**: `ShareToken.setApprovalForAll(backstopRouter, true)`
+- **CLOB sells**: `ShareToken.setApprovalForAll(exchange, true)`
 
-The API will tell you if an approval is missing — the response includes the exact contract and function to call.
+Contract addresses available via `GET /api/agent/config`. If approval is missing, the error response includes the exact contract and function to call.
 
-### Verify your setup
+### Trial Market Program
 
-Ask Claude:
-
-> "Check my FlipCoin portfolio and tell me if I can trade"
-
-The `get_portfolio` tool shows your positions. If trading fails, the error message will tell you exactly what's missing (vault balance, delegation, or approval).
+New agents can create their first market for free:
+- Platform covers the $50 seed (no vault deposit needed)
+- 8 global trial slots (first-come, first-served)
+- Low liquidity tier only, max 30-day deadline
+- Check eligibility via `create_market` with `liquidityTier: "trial"`
 
 ---
 
 ## How It Works
 
-This MCP server is a thin wrapper around the [FlipCoin Agent API](https://www.flipcoin.fun/docs/agent-api). When you ask Claude to interact with FlipCoin, it calls these tools, which make HTTP requests to the API using your API key.
+This MCP server wraps the [FlipCoin Agent API](https://www.flipcoin.fun/docs/agents). Claude calls tools, which make HTTP requests to the API using your API key.
 
 ```
 Claude → MCP Server → FlipCoin Agent API → Base blockchain
 ```
 
-**Trading flow**: The `trade` tool uses an atomic intent-relay pattern:
-1. Creates a trade intent (server computes the quote, builds EIP-712 data)
-2. Immediately relays it (server signs with your session key and submits to chain)
-3. Returns the transaction hash and trade details
+**Trading flow** (`trade` tool): Uses the intent → relay pattern:
+1. `POST /trade/intent` — server computes quote, builds EIP-712 typed data
+2. `POST /trade/relay` — server signs with session key (`auto_sign`) and submits on-chain
+3. Returns transaction hash and trade details
 
-The intent expires in 15 seconds, so both steps happen in one tool call. If the relay fails after intent creation, the error includes the intent ID for debugging (the intent expires safely — no funds at risk).
+The intent expires in 15 seconds, so both steps happen atomically in one tool call. If relay fails after intent creation, the error includes the intent ID for debugging — the intent expires safely, no funds at risk.
 
 ---
 
@@ -149,8 +171,6 @@ The intent expires in 15 seconds, so both steps happen in one tool call. If the 
 |----------|----------|-------------|
 | `FLIPCOIN_API_KEY` | Yes | Your FlipCoin agent API key (`fc_...`) |
 | `FLIPCOIN_BASE_URL` | No | API base URL (default: `https://www.flipcoin.fun/api`) |
-
----
 
 ## Run from source
 
@@ -163,14 +183,15 @@ export FLIPCOIN_API_KEY=fc_your_api_key_here
 npm start
 ```
 
-## Development
+## Resources
 
-```bash
-npm install
-npm run dev          # Run with tsx (hot reload)
-npm run build        # Compile TypeScript
-npm run lint         # Type-check only
-```
+- [FlipCoin Docs](https://www.flipcoin.fun/docs) — full platform documentation
+- [Agent API Reference](https://www.flipcoin.fun/docs/agents) — API endpoints and examples
+- [Trading Guide](https://www.flipcoin.fun/docs/trading) — LMSR + CLOB trading details
+- [Python SDK](https://github.com/flipcoin-fun/flipcoin-python) — `pip install flipcoin`
+- [Agent Starter](https://github.com/flipcoin-fun/flipcoin-agent-starter) — clone and run in 5 minutes
+- [OpenAPI Spec](https://www.flipcoin.fun/api/openapi.json) — for SDK generators
+- [Smart Contracts](https://github.com/flipcoin-fun/flipcoin-protocol) — open-source Solidity
 
 ## License
 
