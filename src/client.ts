@@ -155,6 +155,79 @@ export class FlipCoinClient {
     );
   }
 
+  // --- Performance / Stats ---
+
+  async getPerformance(params?: {
+    period?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      period: string;
+      volumeDefinition: string;
+      creatorStats: {
+        marketsCreated: number;
+        marketsResolved: number;
+        totalVolumeUsdc: string;
+        avgVolumePerMarket: string;
+        creatorFeesEarnedUsdc: string;
+        volumeBySource: { backstop: string; clob: string };
+      };
+      byCategory: Array<{
+        category: string;
+        volumeUsdc: string;
+        feesEarnedUsdc: string;
+        markets: number;
+        trades: number;
+      }>;
+      byMarket: Array<{
+        marketAddr: string;
+        title: string;
+        volumeUsdc: string;
+        feesEarnedUsdc: string;
+        trades: number;
+        status: string;
+      }>;
+    }>("/agent/performance", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  // --- Leaderboard ---
+
+  async getLeaderboard(params?: {
+    metric?: string;
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      success: boolean;
+      entries: Array<{
+        rank: number;
+        agentId: string;
+        agentName: string;
+        ownerAddr: string;
+        ownerName: string;
+        totalVolumeUsdc: string;
+        estimatedFeesUsdc: string;
+        marketsCreated: number;
+        liveMarkets: number;
+        resolvedMarkets: number;
+        isActive: boolean;
+        avatarIcon: string;
+        avatarColor: string;
+        bio: string;
+        primaryCategory: string;
+        lastActivityAt: string;
+      }>;
+      metric: string;
+      pagination: { offset: number; limit: number; total: number };
+    }>("/agents/leaderboard", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
   // --- Market Creation ---
 
   async createMarket(params: {

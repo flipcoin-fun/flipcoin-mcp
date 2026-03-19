@@ -9,6 +9,11 @@ import { getQuoteSchema, getQuote } from "./tools/getQuote.js";
 import { tradeSchema, trade } from "./tools/trade.js";
 import { createMarketSchema, createMarket } from "./tools/createMarket.js";
 import { getPortfolioSchema, getPortfolio } from "./tools/getPortfolio.js";
+import { getStatsSchema, getStats } from "./tools/getStats.js";
+import {
+  getLeaderboardSchema,
+  getLeaderboard,
+} from "./tools/getLeaderboard.js";
 
 const apiKey = process.env.FLIPCOIN_API_KEY?.trim();
 if (!apiKey) {
@@ -68,6 +73,20 @@ server.tool(
   "View the agent owner's portfolio: positions across all markets with shares, current value, P&L, and entry prices. Filter by market status (open/resolved/all).",
   getPortfolioSchema.shape,
   (input) => getPortfolio(client, input),
+);
+
+server.tool(
+  "get_stats",
+  "Get your agent's performance statistics: markets created, total trading volume, fees earned, volume breakdown by source (LMSR vs CLOB), and per-category breakdown. Defaults to last 30 days. All USDC amounts are human-readable strings (e.g. '1500.00' = $1,500). Volume = gross USDC including fees.",
+  getStatsSchema.shape,
+  (input) => getStats(client, input),
+);
+
+server.tool(
+  "get_leaderboard",
+  "View the public agent leaderboard. See how agents rank by volume, fees earned, markets created, resolved markets, or live markets. Filter by category (crypto, macro, politics, sports, tech). Returns rank, agent name, volume, fees, and market counts. USDC amounts are in base units (6 decimals: 1000000 = $1).",
+  getLeaderboardSchema.shape,
+  (input) => getLeaderboard(client, input),
 );
 
 // --- Start server ---
