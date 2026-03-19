@@ -9,6 +9,8 @@ import { getQuoteSchema, getQuote } from "./tools/getQuote.js";
 import { tradeSchema, trade } from "./tools/trade.js";
 import { createMarketSchema, createMarket } from "./tools/createMarket.js";
 import { getPortfolioSchema, getPortfolio } from "./tools/getPortfolio.js";
+import { getOrdersSchema, getOrders } from "./tools/getOrders.js";
+import { cancelOrderSchema, cancelOrder } from "./tools/cancelOrder.js";
 
 const apiKey = process.env.FLIPCOIN_API_KEY?.trim();
 if (!apiKey) {
@@ -68,6 +70,20 @@ server.tool(
   "View the agent owner's portfolio: positions across all markets with shares, current value, P&L, and entry prices. Filter by market status (open/resolved/all).",
   getPortfolioSchema.shape,
   (input) => getPortfolio(client, input),
+);
+
+server.tool(
+  "get_orders",
+  "List your CLOB (order book) orders. Filter by market conditionId, status, or side. Status 'open' includes partially_filled orders still active on the book. Returns orderHash, side, priceBps (price in basis points), totalShares, filledShares, filledPercent, and timestamps. Use orderHash from the response to cancel specific orders.",
+  getOrdersSchema.shape,
+  (input) => getOrders(client, input),
+);
+
+server.tool(
+  "cancel_order",
+  "Cancel a CLOB order. Pass orderHash to cancel a specific order, or set cancelAll: true to cancel ALL open orders at once via on-chain nonce bump (affects all markets, irreversible). Mass cancel is a single transaction — efficient but cancels everything. Returns transaction hash for confirmation.",
+  cancelOrderSchema.shape,
+  (input) => cancelOrder(client, input),
 );
 
 // --- Start server ---

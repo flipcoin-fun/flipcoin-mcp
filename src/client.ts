@@ -155,6 +155,52 @@ export class FlipCoinClient {
     );
   }
 
+  // --- Orders ---
+
+  async getOrders(params?: {
+    status?: string;
+    conditionId?: string;
+    side?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      orders: Array<{
+        orderHash: string;
+        conditionId: string;
+        tokenId: string;
+        side: string;
+        isBuy: boolean;
+        priceBps: number;
+        totalShares: number;
+        filledShares: number;
+        filledPercent: number;
+        status: string;
+        dbStatus: string;
+        timeInForce: string;
+        expiration: string;
+        autoSign: boolean;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      pagination: { offset: number; limit: number; total: number };
+    }>("/agent/orders", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  async cancelOrder(orderHash?: string, cancelAll?: boolean) {
+    const path = `/agent/orders/${orderHash ?? "all"}`;
+    return this.request<{
+      success: boolean;
+      orderHash: string | null;
+      txHash: string;
+    }>(path, {
+      method: "DELETE",
+      query: cancelAll ? { cancelAll: true } : undefined,
+    });
+  }
+
   // --- Market Creation ---
 
   async createMarket(params: {
