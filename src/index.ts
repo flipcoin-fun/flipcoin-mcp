@@ -2,6 +2,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import express from "express";
 import { FlipCoinClient } from "./client.js";
 import { listMarketsSchema, listMarkets } from "./tools/listMarkets.js";
 import { getMarketSchema, getMarket } from "./tools/getMarket.js";
@@ -21,60 +24,136 @@ if (!apiKey) {
 const baseUrl = process.env.FLIPCOIN_BASE_URL;
 const client = new FlipCoinClient(apiKey, baseUrl);
 
-const server = new McpServer({
-  name: "flipcoin",
-  version: "0.1.0",
-});
+// --- Tool registration helper ---
 
-// --- Tool registrations ---
+function registerTools(server: McpServer, flipClient: FlipCoinClient) {
+  server.tool(
+    "list_markets",
+    "Browse prediction markets on FlipCoin. Filter by status, search by title, sort by volume/trades/deadline. Returns market address, title, status, volume, prices, and pagination.",
+    listMarketsSchema.shape,
+    (input) => listMarkets(flipClient, input),
+  );
 
-server.tool(
-  "list_markets",
-  "Browse prediction markets on FlipCoin. Filter by status, search by title, sort by volume/trades/deadline. Returns market address, title, status, volume, prices, and pagination.",
-  listMarketsSchema.shape,
-  (input) => listMarkets(client, input),
-);
+  server.tool(
+    "get_market",
+    "Get detailed information about a specific prediction market including current prices, recent trades, 24h stats, resolution fields, and volume breakdown by source (LMSR vs CLOB).",
+    getMarketSchema.shape,
+    (input) => getMarket(flipClient, input),
+  );
 
-server.tool(
-  "get_market",
-  "Get detailed information about a specific prediction market including current prices, recent trades, 24h stats, resolution fields, and volume breakdown by source (LMSR vs CLOB).",
-  getMarketSchema.shape,
-  (input) => getMarket(client, input),
-);
+  server.tool(
+    "get_quote",
+    "Get a price quote for buying or selling shares in a prediction market. Returns quotes from both LMSR (AMM) and CLOB (order book) with smart routing recommendation. No wallet required.",
+    getQuoteSchema.shape,
+    (input) => getQuote(flipClient, input),
+  );
 
-server.tool(
-  "get_quote",
-  "Get a price quote for buying or selling shares in a prediction market. Returns quotes from both LMSR (AMM) and CLOB (order book) with smart routing recommendation. No wallet required.",
-  getQuoteSchema.shape,
-  (input) => getQuote(client, input),
-);
+  server.tool(
+    "trade",
+    "Execute a trade (buy or sell) on a prediction market. Creates an intent and immediately relays it. Requires auto_sign delegation setup. Amount is in USDC base units (6 decimals: 1000000 = $1).",
+    tradeSchema.shape,
+    (input) => trade(flipClient, input),
+  );
 
-server.tool(
-  "trade",
-  "Execute a trade (buy or sell) on a prediction market. Creates an intent and immediately relays it. Requires auto_sign delegation setup. Amount is in USDC base units (6 decimals: 1000000 = $1).",
-  tradeSchema.shape,
-  (input) => trade(client, input),
-);
+  server.tool(
+    "create_market",
+    "Create a new prediction market on FlipCoin. Requires title, resolution criteria, and resolution source URL. Optionally set category, liquidity tier, initial price. Requires auto_sign delegation for autonomous operation.",
+    createMarketSchema.shape,
+    (input) => createMarket(flipClient, input),
+  );
 
-server.tool(
-  "create_market",
-  "Create a new prediction market on FlipCoin. Requires title, resolution criteria, and resolution source URL. Optionally set category, liquidity tier, initial price. Requires auto_sign delegation for autonomous operation.",
-  createMarketSchema.shape,
-  (input) => createMarket(client, input),
-);
-
-server.tool(
-  "get_portfolio",
-  "View the agent owner's portfolio: positions across all markets with shares, current value, P&L, and entry prices. Filter by market status (open/resolved/all).",
-  getPortfolioSchema.shape,
-  (input) => getPortfolio(client, input),
-);
+  server.tool(
+    "get_portfolio",
+    "View the agent owner's portfolio: positions across all markets with shares, current value, P&L, and entry prices. Filter by market status (open/resolved/all).",
+    getPortfolioSchema.shape,
+    (input) => getPortfolio(flipClient, input),
+  );
+}
 
 // --- Start server ---
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
+
+  if (!port) {
+    // Default: stdio mode (existing behavior, unchanged)
+    const server = new McpServer({ name: "flipcoin", version: "0.1.0" });
+    registerTools(server, client);
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    return;
+  }
+
+  // --- HTTP mode ---
+  const app = express();
+  app.use(express.json());
+
+  // Optional auth middleware
+  const requireAuth = process.env.REQUIRE_AUTH === "true";
+  if (requireAuth) {
+    app.use((req, res, next) => {
+      // Skip auth for health check
+      if (req.path === "/health") return next();
+      const authHeader = req.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${apiKey}`) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      next();
+    });
+  }
+
+  // Health check
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true, mode: "http", tools: 6 });
+  });
+
+  // --- StreamableHTTP transport at /mcp ---
+  const httpTransport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless mode
+  });
+  const httpServer = new McpServer({ name: "flipcoin", version: "0.1.0" });
+  registerTools(httpServer, client);
+  await httpServer.connect(httpTransport);
+
+  app.all("/mcp", async (req, res) => {
+    await httpTransport.handleRequest(req, res, req.body);
+  });
+
+  // --- Legacy SSE transport at /sse + /messages ---
+  const sseTransports = new Map<string, SSEServerTransport>();
+
+  app.get("/sse", async (req, res) => {
+    const transport = new SSEServerTransport("/messages", res);
+    sseTransports.set(transport.sessionId, transport);
+
+    res.on("close", () => {
+      sseTransports.delete(transport.sessionId);
+    });
+
+    const sseServer = new McpServer({ name: "flipcoin", version: "0.1.0" });
+    registerTools(sseServer, client);
+    await sseServer.connect(transport);
+  });
+
+  app.post("/messages", async (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    const transport = sseTransports.get(sessionId);
+    if (!transport) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+    await transport.handlePostMessage(req, res);
+  });
+
+  app.listen(port, () => {
+    console.error(`FlipCoin MCP server listening on port ${port}`);
+    console.error(`  StreamableHTTP: http://localhost:${port}/mcp`);
+    console.error(`  SSE (legacy):   http://localhost:${port}/sse`);
+    if (requireAuth) {
+      console.error(`  Auth: required (Bearer token)`);
+    }
+  });
 }
 
 main().catch((error) => {

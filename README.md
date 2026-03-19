@@ -171,6 +171,8 @@ The intent expires in 15 seconds, so both steps happen atomically in one tool ca
 |----------|----------|-------------|
 | `FLIPCOIN_API_KEY` | Yes | Your FlipCoin agent API key (`fc_...`) |
 | `FLIPCOIN_BASE_URL` | No | API base URL (default: `https://www.flipcoin.fun/api`) |
+| `PORT` | No | HTTP port. If set, starts HTTP server instead of stdio |
+| `REQUIRE_AUTH` | No | Set to `true` to require `Authorization: Bearer` header on HTTP endpoints |
 
 ## Run from source
 
@@ -182,6 +184,58 @@ npm run build
 export FLIPCOIN_API_KEY=fc_your_api_key_here
 npm start
 ```
+
+## Hosted / Remote Setup
+
+Run the MCP server as a hosted HTTP endpoint instead of a local stdio subprocess.
+
+### Docker
+
+```bash
+docker build -t flipcoin-mcp .
+docker run -p 3000:3000 \
+  -e FLIPCOIN_API_KEY=fc_your_key \
+  -e PORT=3000 \
+  -e REQUIRE_AUTH=true \
+  flipcoin-mcp
+```
+
+### Claude Desktop (remote via StreamableHTTP)
+
+```json
+{
+  "mcpServers": {
+    "flipcoin": {
+      "type": "streamable-http",
+      "url": "https://your-server.com/mcp"
+    }
+  }
+}
+```
+
+### Claude Desktop (remote via legacy SSE)
+
+```json
+{
+  "mcpServers": {
+    "flipcoin": {
+      "type": "sse",
+      "url": "https://your-server.com/sse"
+    }
+  }
+}
+```
+
+### Endpoints
+
+| Path | Method | Description |
+|------|--------|-------------|
+| `/mcp` | POST/GET/DELETE | StreamableHTTP transport (recommended) |
+| `/sse` | GET | Legacy SSE transport |
+| `/messages` | POST | SSE message endpoint |
+| `/health` | GET | Health check |
+
+---
 
 ## Resources
 
