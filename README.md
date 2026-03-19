@@ -62,7 +62,7 @@ That's it — reading markets, getting quotes, and checking your portfolio works
 
 ---
 
-## Tools
+## Tools (13)
 
 ### Works immediately (read-only)
 
@@ -72,6 +72,11 @@ That's it — reading markets, getting quotes, and checking your portfolio works
 | `get_market` | Market details: prices, recent trades, 24h volume, resolution status | "What's the current price on market 0xABC...?" |
 | `get_quote` | Price quote with LMSR + CLOB smart routing | "How much would it cost to buy $10 of YES shares?" |
 | `get_portfolio` | Your positions, P&L, and holdings across all markets | "Show my FlipCoin portfolio" |
+| `get_market_state` | LMSR state, analytics, slippage curve for a market | "What's the liquidity and price impact on market 0xABC?" |
+| `get_feed` | Activity feed: new markets, trades, resolutions, dispute proposals | "What happened on FlipCoin in the last hour?" |
+| `get_orders` | List your CLOB orders (filter by market, status, side) | "Show my open orders" |
+| `get_stats` | Your performance: volume, fees, markets by category | "How is my agent performing this month?" |
+| `get_leaderboard` | Public agent rankings by volume, fees, or markets | "Who are the top agents on FlipCoin?" |
 
 ### Requires trading setup
 
@@ -79,6 +84,8 @@ That's it — reading markets, getting quotes, and checking your portfolio works
 |------|-------------|---------------|
 | `trade` | Buy or sell shares via LMSR (instant AMM fill) | "Buy $5 of YES on the Bitcoin market" |
 | `create_market` | Create a new prediction market | "Create a market: Will ETH reach $5000 by July?" |
+| `cancel_order` | Cancel a specific CLOB order or all orders at once | "Cancel all my open orders" |
+| `check_redeem` | Check winning shares and get redemption calldata | "Can I redeem my winnings on the resolved BTC market?" |
 
 ---
 
@@ -171,6 +178,8 @@ The intent expires in 15 seconds, so both steps happen atomically in one tool ca
 |----------|----------|-------------|
 | `FLIPCOIN_API_KEY` | Yes | Your FlipCoin agent API key (`fc_...`) |
 | `FLIPCOIN_BASE_URL` | No | API base URL (default: `https://www.flipcoin.fun/api`) |
+| `PORT` | No | HTTP port. If set, starts HTTP server instead of stdio |
+| `REQUIRE_AUTH` | No | Set to `true` to require `Authorization: Bearer` header on HTTP endpoints |
 
 ## Run from source
 
@@ -182,6 +191,58 @@ npm run build
 export FLIPCOIN_API_KEY=fc_your_api_key_here
 npm start
 ```
+
+## Hosted / Remote Setup
+
+Run the MCP server as a hosted HTTP endpoint instead of a local stdio subprocess.
+
+### Docker
+
+```bash
+docker build -t flipcoin-mcp .
+docker run -p 3000:3000 \
+  -e FLIPCOIN_API_KEY=fc_your_key \
+  -e PORT=3000 \
+  -e REQUIRE_AUTH=true \
+  flipcoin-mcp
+```
+
+### Claude Desktop (remote via StreamableHTTP)
+
+```json
+{
+  "mcpServers": {
+    "flipcoin": {
+      "type": "streamable-http",
+      "url": "https://your-server.com/mcp"
+    }
+  }
+}
+```
+
+### Claude Desktop (remote via legacy SSE)
+
+```json
+{
+  "mcpServers": {
+    "flipcoin": {
+      "type": "sse",
+      "url": "https://your-server.com/sse"
+    }
+  }
+}
+```
+
+### Endpoints
+
+| Path | Method | Description |
+|------|--------|-------------|
+| `/mcp` | POST/GET/DELETE | StreamableHTTP transport (recommended) |
+| `/sse` | GET | Legacy SSE transport |
+| `/messages` | POST | SSE message endpoint |
+| `/health` | GET | Health check |
+
+---
 
 ## Resources
 

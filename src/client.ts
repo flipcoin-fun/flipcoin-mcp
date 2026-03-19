@@ -155,6 +155,200 @@ export class FlipCoinClient {
     );
   }
 
+  // --- Market State ---
+
+  async getMarketState(address: string) {
+    return this.request<{
+      success: boolean;
+      market: string;
+      conditionId: string;
+      lmsr: {
+        qYes: string;
+        qNo: string;
+        b: string;
+        priceYesBps: number;
+        priceNoBps: number;
+      };
+      analytics: {
+        volume24h: string;
+        trades24h: number;
+        liquidityUsdc: string;
+      };
+      slippageCurve: Array<{
+        amountUsdc: string;
+        priceImpactBps: number;
+        effectivePriceBps: number;
+      }>;
+    }>(`/agent/markets/${address}/state`);
+  }
+
+  // --- Feed ---
+
+  async getFeed(params: {
+    since: string;
+    types?: string;
+    limit?: number;
+  }) {
+    return this.request<{
+      events: Array<{
+        type: string;
+        timestamp: string;
+        data: Record<string, unknown>;
+      }>;
+      cursor: string;
+      hasMore: boolean;
+    }>("/agent/feed", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  // --- Redeem ---
+
+  async checkRedeem(conditionId: string) {
+    return this.request<{
+      conditionId: string;
+      redeemable: boolean;
+      resolutionStatus?: number;
+      outcome?: string;
+      yesShares?: string;
+      noShares?: string;
+      winningShares?: string;
+      expectedPayout?: string;
+      payoutPerShare?: string;
+      marketAddr?: string;
+      title?: string;
+      transaction?: {
+        to: string;
+        data: string;
+        value: string;
+        gas: string;
+      };
+      hint?: string;
+    }>("/agent/portfolio/redeem", {
+      method: "POST",
+      body: { conditionId },
+    });
+  }
+
+  // --- Orders ---
+
+  async getOrders(params?: {
+    status?: string;
+    conditionId?: string;
+    side?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      orders: Array<{
+        orderHash: string;
+        conditionId: string;
+        tokenId: string;
+        side: string;
+        isBuy: boolean;
+        priceBps: number;
+        totalShares: number;
+        filledShares: number;
+        filledPercent: number;
+        status: string;
+        dbStatus: string;
+        timeInForce: string;
+        expiration: string;
+        autoSign: boolean;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      pagination: { offset: number; limit: number; total: number };
+    }>("/agent/orders", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  async cancelOrder(orderHash?: string, cancelAll?: boolean) {
+    const path = `/agent/orders/${orderHash ?? "all"}`;
+    return this.request<{
+      success: boolean;
+      orderHash: string | null;
+      txHash: string;
+    }>(path, {
+      method: "DELETE",
+      query: cancelAll ? { cancelAll: true } : undefined,
+    });
+  }
+
+  // --- Performance / Stats ---
+
+  async getPerformance(params?: {
+    period?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      period: string;
+      volumeDefinition: string;
+      creatorStats: {
+        marketsCreated: number;
+        marketsResolved: number;
+        totalVolumeUsdc: string;
+        avgVolumePerMarket: string;
+        creatorFeesEarnedUsdc: string;
+        volumeBySource: { backstop: string; clob: string };
+      };
+      byCategory: Array<{
+        category: string;
+        volumeUsdc: string;
+        feesEarnedUsdc: string;
+        markets: number;
+        trades: number;
+      }>;
+      byMarket: Array<{
+        marketAddr: string;
+        title: string;
+        volumeUsdc: string;
+        feesEarnedUsdc: string;
+        trades: number;
+        status: string;
+      }>;
+    }>("/agent/performance", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  // --- Leaderboard ---
+
+  async getLeaderboard(params?: {
+    metric?: string;
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      success: boolean;
+      entries: Array<{
+        rank: number;
+        agentId: string;
+        agentName: string;
+        ownerAddr: string;
+        ownerName: string;
+        totalVolumeUsdc: string;
+        estimatedFeesUsdc: string;
+        marketsCreated: number;
+        liveMarkets: number;
+        resolvedMarkets: number;
+        isActive: boolean;
+        avatarIcon: string;
+        avatarColor: string;
+        bio: string;
+        primaryCategory: string;
+        lastActivityAt: string;
+      }>;
+      metric: string;
+      pagination: { offset: number; limit: number; total: number };
+    }>("/agents/leaderboard", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
   // --- Market Creation ---
 
   async createMarket(params: {
