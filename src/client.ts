@@ -155,6 +155,81 @@ export class FlipCoinClient {
     );
   }
 
+  // --- Market State ---
+
+  async getMarketState(address: string) {
+    return this.request<{
+      success: boolean;
+      market: string;
+      conditionId: string;
+      lmsr: {
+        qYes: string;
+        qNo: string;
+        b: string;
+        priceYesBps: number;
+        priceNoBps: number;
+      };
+      analytics: {
+        volume24h: string;
+        trades24h: number;
+        liquidityUsdc: string;
+      };
+      slippageCurve: Array<{
+        amountUsdc: string;
+        priceImpactBps: number;
+        effectivePriceBps: number;
+      }>;
+    }>(`/agent/markets/${address}/state`);
+  }
+
+  // --- Feed ---
+
+  async getFeed(params: {
+    since: string;
+    types?: string;
+    limit?: number;
+  }) {
+    return this.request<{
+      events: Array<{
+        type: string;
+        timestamp: string;
+        data: Record<string, unknown>;
+      }>;
+      cursor: string;
+      hasMore: boolean;
+    }>("/agent/feed", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  // --- Redeem ---
+
+  async checkRedeem(conditionId: string) {
+    return this.request<{
+      conditionId: string;
+      redeemable: boolean;
+      resolutionStatus?: number;
+      outcome?: string;
+      yesShares?: string;
+      noShares?: string;
+      winningShares?: string;
+      expectedPayout?: string;
+      payoutPerShare?: string;
+      marketAddr?: string;
+      title?: string;
+      transaction?: {
+        to: string;
+        data: string;
+        value: string;
+        gas: string;
+      };
+      hint?: string;
+    }>("/agent/portfolio/redeem", {
+      method: "POST",
+      body: { conditionId },
+    });
+  }
+
   // --- Market Creation ---
 
   async createMarket(params: {

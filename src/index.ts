@@ -12,6 +12,12 @@ import { getQuoteSchema, getQuote } from "./tools/getQuote.js";
 import { tradeSchema, trade } from "./tools/trade.js";
 import { createMarketSchema, createMarket } from "./tools/createMarket.js";
 import { getPortfolioSchema, getPortfolio } from "./tools/getPortfolio.js";
+import {
+  getMarketStateSchema,
+  getMarketState,
+} from "./tools/getMarketState.js";
+import { getFeedSchema, getFeed } from "./tools/getFeed.js";
+import { checkRedeemSchema, checkRedeem } from "./tools/checkRedeem.js";
 
 const apiKey = process.env.FLIPCOIN_API_KEY?.trim();
 if (!apiKey) {
@@ -69,6 +75,27 @@ function registerTools(server: McpServer, flipClient: FlipCoinClient) {
     (input) => getPortfolio(flipClient, input),
   );
 }
+
+server.tool(
+  "get_market_state",
+  "Check resolution status and LMSR state of a market. Returns current prices (YES/NO in basis points), LMSR pool quantities (qYes/qNo/b), 24h analytics (volume, trades, liquidity), and a slippage curve showing price impact at various trade sizes. Use this to monitor markets approaching resolution or to assess liquidity before trading.",
+  getMarketStateSchema.shape,
+  (input) => getMarketState(client, input),
+);
+
+server.tool(
+  "get_feed",
+  "Get activity feed of platform events. Filter by type: 'market_created' (new markets), 'trade' (executed trades), 'market_resolved' (final outcomes), 'resolution_proposed' (markets entering 24h dispute period). Returns events with timestamps and market-specific payload. Use cursor-based pagination — pass the returned 'cursor' as 'since' in the next call.",
+  getFeedSchema.shape,
+  (input) => getFeed(client, input),
+);
+
+server.tool(
+  "check_redeem",
+  "Check if you have winning shares to redeem in a resolved market. Pass the market's conditionId (from get_market response). If redeemable=true, returns transaction calldata that the owner wallet must submit on-chain to collect USDC winnings. Amounts are in USDC base units (6 decimals: 1000000 = $1).",
+  checkRedeemSchema.shape,
+  (input) => checkRedeem(client, input),
+);
 
 // --- Start server ---
 
