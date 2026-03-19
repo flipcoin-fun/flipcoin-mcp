@@ -4,6 +4,10 @@
   "description": "FlipCoin prediction markets MCP server for Claude",
   "type": "module",
   "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "bin": {
     "flipcoin-mcp": "dist/index.js"
   },
