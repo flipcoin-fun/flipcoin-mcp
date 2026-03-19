@@ -26,7 +26,7 @@ import {
   getLeaderboard,
 } from "./tools/getLeaderboard.js";
 
-const TOOL_COUNT = 12;
+const TOOL_COUNT = 13;
 
 const apiKey = process.env.FLIPCOIN_API_KEY?.trim();
 if (!apiKey) {

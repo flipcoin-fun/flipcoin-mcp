@@ -62,7 +62,7 @@ That's it — reading markets, getting quotes, and checking your portfolio works
 
 ---
 
-## Tools (12)
+## Tools (13)
 
 ### Works immediately (read-only)
 
