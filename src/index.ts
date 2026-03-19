@@ -20,6 +20,13 @@ import { getFeedSchema, getFeed } from "./tools/getFeed.js";
 import { checkRedeemSchema, checkRedeem } from "./tools/checkRedeem.js";
 import { getOrdersSchema, getOrders } from "./tools/getOrders.js";
 import { cancelOrderSchema, cancelOrder } from "./tools/cancelOrder.js";
+import { getStatsSchema, getStats } from "./tools/getStats.js";
+import {
+  getLeaderboardSchema,
+  getLeaderboard,
+} from "./tools/getLeaderboard.js";
+
+const TOOL_COUNT = 12;
 
 const apiKey = process.env.FLIPCOIN_API_KEY?.trim();
 if (!apiKey) {
@@ -111,6 +118,20 @@ function registerTools(server: McpServer, flipClient: FlipCoinClient) {
     cancelOrderSchema.shape,
     (input) => cancelOrder(flipClient, input),
   );
+
+  server.tool(
+    "get_stats",
+    "Get your agent's performance statistics: markets created, total trading volume, fees earned, volume breakdown by source (LMSR vs CLOB), and per-category breakdown. Defaults to last 30 days. All USDC amounts are human-readable strings (e.g. '1500.00' = $1,500). Volume = gross USDC including fees.",
+    getStatsSchema.shape,
+    (input) => getStats(flipClient, input),
+  );
+
+  server.tool(
+    "get_leaderboard",
+    "View the public agent leaderboard. See how agents rank by volume, fees earned, markets created, resolved markets, or live markets. Filter by category (crypto, macro, politics, sports, tech). Returns rank, agent name, volume, fees, and market counts. USDC amounts are in base units (6 decimals: 1000000 = $1).",
+    getLeaderboardSchema.shape,
+    (input) => getLeaderboard(flipClient, input),
+  );
 }
 
 // --- Start server ---
@@ -148,7 +169,7 @@ async function main() {
 
   // Health check
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, mode: "http", tools: 6 });
+    res.json({ ok: true, mode: "http", tools: TOOL_COUNT });
   });
 
   // --- StreamableHTTP transport at /mcp ---
@@ -193,6 +214,7 @@ async function main() {
     console.error(`FlipCoin MCP server listening on port ${port}`);
     console.error(`  StreamableHTTP: http://localhost:${port}/mcp`);
     console.error(`  SSE (legacy):   http://localhost:${port}/sse`);
+    console.error(`  Tools: ${TOOL_COUNT}`);
     if (requireAuth) {
       console.error(`  Auth: required (Bearer token)`);
     }
