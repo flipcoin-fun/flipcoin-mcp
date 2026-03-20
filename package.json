@@ -1,6 +1,7 @@
 {
   "name": "@flipcoin/mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.2",
+  "mcpName": "io.github.MrTalecky/flipcoin",
   "description": "FlipCoin prediction markets MCP server for Claude",
   "type": "module",
   "main": "dist/index.js",
