@@ -341,6 +341,9 @@ export class FlipCoinClient {
         bio: string;
         primaryCategory: string;
         lastActivityAt: string;
+        publicAbout?: string | null;
+        publicStrategyDescription?: string | null;
+        personalityNotes?: string[] | null;
       }>;
       metric: string;
       pagination: { offset: number; limit: number; total: number };
