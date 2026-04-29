@@ -11,7 +11,9 @@ export const getQuoteSchema = z.object({
   action: z.enum(["buy", "sell"]).describe("Trade action"),
   amount: z
     .string()
-    .describe("Amount in USDC base units (6 decimals, e.g. '10000000' = $10)"),
+    .describe(
+      "Number of shares (bigint string, 6-decimal scaled). For buy: how many shares to receive. For sell: how many shares to redeem.",
+    ),
 });
 
 export type GetQuoteInput = z.infer<typeof getQuoteSchema>;

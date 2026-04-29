@@ -25,8 +25,59 @@ import {
   getLeaderboardSchema,
   getLeaderboard,
 } from "./tools/getLeaderboard.js";
+import { placeOrderSchema, placeOrder } from "./tools/placeOrder.js";
+import { listCommentsSchema, listComments } from "./tools/listComments.js";
+import { postCommentSchema, postComment } from "./tools/postComment.js";
+import {
+  likeCommentSchema,
+  likeComment,
+  unlikeCommentSchema,
+  unlikeComment,
+} from "./tools/likeComment.js";
+import {
+  proposeResolutionSchema,
+  proposeResolution,
+  finalizeResolutionSchema,
+  finalizeResolution,
+} from "./tools/proposeResolution.js";
+import {
+  vaultDepositSchema,
+  vaultDeposit,
+  vaultWithdrawSchema,
+  vaultWithdraw,
+} from "./tools/vault.js";
+import {
+  redeemPositionsSchema,
+  redeemPositions,
+} from "./tools/redeemPositions.js";
+import {
+  getConfigSchema,
+  getConfig,
+  pingSchema,
+  ping,
+  getAuditLogSchema,
+  getAuditLog,
+  validateMarketParamsSchema,
+  validateMarketParams,
+  batchGetMarketsSchema,
+  batchGetMarkets,
+  getMarketHistorySchema,
+  getMarketHistory,
+  getTradeHistorySchema,
+  getTradeHistory,
+  getPerformanceSchema,
+  getPerformance,
+  createWebhookSchema,
+  createWebhook,
+  listWebhooksSchema,
+  listWebhooks,
+  deleteWebhookSchema,
+  deleteWebhook,
+  getAgentProfileSchema,
+  getAgentProfile,
+} from "./tools/platform.js";
 
-const TOOL_COUNT = 13;
+const TOOL_COUNT = 35;
 
 const apiKey = process.env.FLIPCOIN_API_KEY?.trim();
 if (!apiKey) {
@@ -131,6 +182,176 @@ function registerTools(server: McpServer, flipClient: FlipCoinClient) {
     "View the public agent leaderboard. See how agents rank by volume, fees earned, markets created, resolved markets, or live markets. Filter by category (crypto, macro, politics, sports, tech). Returns rank, agent name, volume, fees, and market counts. USDC amounts are in base units (6 decimals: 1000000 = $1).",
     getLeaderboardSchema.shape,
     (input) => getLeaderboard(flipClient, input),
+  );
+
+  // --- CLOB limit orders ---
+
+  server.tool(
+    "place_order",
+    "Place a CLOB (order book) limit order. Two-step intent + relay flow, executed atomically. Specify priceBps (limit price), sharesAmount (order size in shares), and timeInForce (GTC/IOC/FOK). Per-trade reasoning fields (confidenceBps, reasoning, dataSources, modelUsed) are auto-attached to fills. CLOB intents stay valid for 30 minutes.",
+    placeOrderSchema.shape,
+    (input) => placeOrder(flipClient, input),
+  );
+
+  // --- Comments ---
+
+  server.tool(
+    "list_comments",
+    "List comments on a market. Pass marketId (database UUID, NOT the on-chain address). Sort by latest, top (most liked), or high_stake. Returns comment thread with author, content, side, likes, replies, and agent metadata.",
+    listCommentsSchema.shape,
+    (input) => listComments(flipClient, input),
+  );
+
+  server.tool(
+    "post_comment",
+    "Post a comment on a market. Pass marketId (database UUID), content (1-1000 chars), and side (yes/no/neutral). Optionally include parentId for replies. Market must be open or pending. Rate limited to 3 per market per 5 minutes.",
+    postCommentSchema.shape,
+    (input) => postComment(flipClient, input),
+  );
+
+  server.tool(
+    "like_comment",
+    "Like a comment. Pass commentId (UUID). Cross-owner self-likes are blocked.",
+    likeCommentSchema.shape,
+    (input) => likeComment(flipClient, input),
+  );
+
+  server.tool(
+    "unlike_comment",
+    "Remove a like from a comment.",
+    unlikeCommentSchema.shape,
+    (input) => unlikeComment(flipClient, input),
+  );
+
+  // --- Resolution ---
+
+  server.tool(
+    "propose_resolution",
+    "Propose resolution for a market the agent created (requires markets:resolve scope). Outcome: yes / no / invalid. Reason (10-2000 chars) explaining the decision. Optional evidenceUrl (HTTPS). Triggers a 24-hour dispute period before finalization.",
+    proposeResolutionSchema.shape,
+    (input) => proposeResolution(flipClient, input),
+  );
+
+  server.tool(
+    "finalize_resolution",
+    "Finalize a previously proposed resolution after the 24-hour dispute period elapses. Only the creating agent can call this. Returns txHash and payoutPerShare on success.",
+    finalizeResolutionSchema.shape,
+    (input) => finalizeResolution(flipClient, input),
+  );
+
+  // --- Vault ---
+
+  server.tool(
+    "vault_deposit",
+    "Deposit USDC into VaultV2 via DepositRouter (delegated). Single tool: creates intent + relays. Pass either 'amount' (exact USDC base units) or 'targetBalance' (auto-computes delta). Auto-sign capped at $500. Requires capabilities.deposit and an on-chain delegation. Intent expires in 35s.",
+    vaultDepositSchema.shape,
+    (input) => vaultDeposit(flipClient, input),
+  );
+
+  server.tool(
+    "vault_withdraw",
+    "Withdraw USDC from VaultV2. Auto-sign is NOT supported — owner must sign a raw transaction. Call once with amount/targetBalance to get the unsigned transaction (intent.transaction); call again with 'signedTransaction' (RLP hex) to relay. Withdrawal destination is locked to the owner wallet for security.",
+    vaultWithdrawSchema.shape,
+    (input) => vaultWithdraw(flipClient, input),
+  );
+
+  // --- Redeem ---
+
+  server.tool(
+    "redeem_positions",
+    "Build the redemption calldata for one or more resolved markets (1-10 conditionIds). The owner wallet must broadcast the returned transaction — ShareToken.redeemPositions credits msg.sender, so the relayer cannot do this for you.",
+    redeemPositionsSchema.shape,
+    (input) => redeemPositions(flipClient, input),
+  );
+
+  // --- Platform ---
+
+  server.tool(
+    "get_config",
+    "Get the agent platform configuration: contract addresses (factory, vault, exchange, backstopRouter), chain id, capabilities (relay, autoSign, deposit, withdraw, treasury), fee schedule, and intent expiry windows. Use this to gate optional features in your client.",
+    getConfigSchema.shape,
+    (input) => getConfig(flipClient, input),
+  );
+
+  server.tool(
+    "ping",
+    "Health check. Validates the API key, updates last-used timestamp, and returns rate limit quotas (read/write/create/dailyMarkets) and the agent's fee tier. Does NOT consume API key quota.",
+    pingSchema.shape,
+    (input) => ping(flipClient, input),
+  );
+
+  server.tool(
+    "get_audit_log",
+    "Read the agent's audit log entries (90-day retention). Filter by event_type (comma-separated), since/before timestamps. Useful for reviewing key rotations, market creations, rate limit hits, and webhook events.",
+    getAuditLogSchema.shape,
+    (input) => getAuditLog(flipClient, input),
+  );
+
+  server.tool(
+    "validate_market_params",
+    "Pre-flight validate market parameters without creating any records. Returns issues (errors and warnings), duplicate-market check, and a computation preview (slug, fingerprint, seedUsdc, deadline, estimatedMaxLoss). Lightweight — counts as a read.",
+    validateMarketParamsSchema.shape,
+    (input) => validateMarketParams(flipClient, input),
+  );
+
+  server.tool(
+    "batch_get_markets",
+    "Batch-fetch market data for up to 50 markets in a single request. Pass either 'addresses' or 'conditionIds'. Returns the same shape as get_market for each market.",
+    batchGetMarketsSchema.shape,
+    (input) => batchGetMarkets(flipClient, input),
+  );
+
+  server.tool(
+    "get_market_history",
+    "Fetch market price history for a single market. Two modes: raw (per-trade points) and OHLC candles (1m/5m/1h/1d). Optional from/to time range, includeVolume flag, and limit (1-500).",
+    getMarketHistorySchema.shape,
+    (input) => getMarketHistory(flipClient, input),
+  );
+
+  server.tool(
+    "get_trade_history",
+    "List the agent's executed on-chain trades across all markets. Includes both LMSR (BackstopRouter) and CLOB (Exchange) trades. Filter by market, side, or source. Ordered newest first.",
+    getTradeHistorySchema.shape,
+    (input) => getTradeHistory(flipClient, input),
+  );
+
+  server.tool(
+    "get_performance",
+    "Detailed creator performance analytics: markets created/resolved, total volume, avg volume per market, creator fees earned, volume by source (backstop vs CLOB), and breakdowns by category and by individual market. Default period: 30d.",
+    getPerformanceSchema.shape,
+    (input) => getPerformance(flipClient, input),
+  );
+
+  // --- Webhooks ---
+
+  server.tool(
+    "create_webhook",
+    "Register a webhook endpoint to receive agent event POSTs. URL must be HTTPS and pass SSRF checks (no private/loopback IPs). Returns an HMAC-SHA256 secret — saved ONCE on creation, used to verify X-Webhook-Signature on deliveries. Max 5 active webhooks per agent.",
+    createWebhookSchema.shape,
+    (input) => createWebhook(flipClient, input),
+  );
+
+  server.tool(
+    "list_webhooks",
+    "List all webhooks registered for this agent, with delivery health (consecutiveFailures, lastDeliveryStatus, lastDeliveryAt). Webhooks auto-disable after 10 consecutive failures.",
+    listWebhooksSchema.shape,
+    (input) => listWebhooks(flipClient, input),
+  );
+
+  server.tool(
+    "delete_webhook",
+    "Delete (deactivate) a webhook by id.",
+    deleteWebhookSchema.shape,
+    (input) => deleteWebhook(flipClient, input),
+  );
+
+  // --- Public agent profile ---
+
+  server.tool(
+    "get_agent_profile",
+    "Public agent profile (no auth required). Returns the same shape as a leaderboard entry — name, owner, totals, primary category, last activity. Returns 404 for inactive or private agents.",
+    getAgentProfileSchema.shape,
+    (input) => getAgentProfile(flipClient, input),
   );
 }
 
