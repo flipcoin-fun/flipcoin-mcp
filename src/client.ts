@@ -140,11 +140,23 @@ export class FlipCoinClient {
     conditionId: string;
     side: string;
     action: string;
-    usdcAmount: string;
+    usdcAmount?: string;
+    sharesAmount?: string;
+    venue?: string;
+    maxSlippageBps?: number;
+    maxFeeBps?: number;
+    confidenceBps?: number;
+    reasoning?: string;
+    dataSources?: string[];
+    modelUsed?: string;
   }) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
     return this.request<import("./types.js").TradeIntentResponse>(
       "/agent/trade/intent",
-      { method: "POST", body: params as unknown as Record<string, unknown> },
+      { method: "POST", body },
     );
   }
 
@@ -369,5 +381,429 @@ export class FlipCoinClient {
         body: params as unknown as Record<string, unknown>,
       },
     );
+  }
+
+  // --- CLOB Limit Orders ---
+
+  async orderIntent(params: {
+    conditionId: string;
+    side: string;
+    action: string;
+    priceBps: number;
+    amount: string;
+    timeInForce?: string;
+    expirationSeconds?: number;
+    maxFeeBps?: number;
+    confidenceBps?: number;
+    reasoning?: string;
+    dataSources?: string[];
+    modelUsed?: string;
+  }) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      intentId: string;
+      conditionId: string;
+      side: string;
+      action: string;
+      priceBps: number;
+      amount: string;
+      typedData?: Record<string, unknown>;
+      expiresAt: string;
+    }>("/agent/orders/intent", { method: "POST", body });
+  }
+
+  async orderRelay(params: {
+    intentId: string;
+    auto_sign?: boolean;
+    signature?: string;
+  }) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      success: boolean;
+      orderHash: string;
+      txHash?: string;
+      filledShares?: string;
+      status?: string;
+    }>("/agent/orders/relay", { method: "POST", body });
+  }
+
+  // --- Comments ---
+
+  async listComments(params: {
+    marketId: string;
+    sort?: string;
+    limit?: number;
+  }) {
+    return this.request<{
+      comments: Array<{
+        id: string;
+        marketId: string;
+        author: string;
+        authorName: string;
+        content: string;
+        side: string;
+        parentId: string | null;
+        createdAt: string;
+        likesCount: number;
+        replyCount: number;
+        isAgent: boolean;
+        agentId?: string;
+        agentName?: string;
+      }>;
+    }>("/agent/comments", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  async postComment(params: {
+    marketId: string;
+    content: string;
+    side: string;
+    parentId?: string;
+  }) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      comment: {
+        id: string;
+        marketId: string;
+        content: string;
+        side: string;
+        parentId: string | null;
+        createdAt: string;
+      };
+    }>("/agent/comments", { method: "POST", body });
+  }
+
+  async likeComment(commentId: string) {
+    return this.request<{ success: boolean }>(
+      `/agent/comments/${commentId}/like`,
+      { method: "POST" },
+    );
+  }
+
+  async unlikeComment(commentId: string) {
+    return this.request<{ success: boolean }>(
+      `/agent/comments/${commentId}/like`,
+      { method: "DELETE" },
+    );
+  }
+
+  // --- Resolution ---
+
+  async proposeResolution(
+    address: string,
+    params: { outcome: string; reason: string; evidenceUrl?: string },
+  ) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      status: string;
+      marketAddr: string;
+      txHash: string;
+      outcome: string;
+      proposedAt: string;
+      finalizeAfter: string;
+      disputePeriodHours: number;
+    }>(`/agent/markets/${address}/propose-resolution`, {
+      method: "POST",
+      body,
+    });
+  }
+
+  async finalizeResolution(address: string) {
+    return this.request<{
+      status: string;
+      marketAddr: string;
+      txHash: string;
+      outcome: string;
+      payoutPerShare: string;
+    }>(`/agent/markets/${address}/finalize-resolution`, {
+      method: "POST",
+      body: {},
+    });
+  }
+
+  // --- Vault ---
+
+  async vaultDepositInfo() {
+    return this.request<{
+      vaultBalance: string;
+      walletBalance: string;
+      allowance: string;
+      depositRouterAddress: string;
+      approvalRequired: boolean;
+      recentDeposits: Array<{
+        id: string;
+        amount: string;
+        status: string;
+        txHash?: string;
+        createdAt: string;
+      }>;
+    }>("/agent/vault/deposit");
+  }
+
+  async vaultDepositIntent(params: {
+    amount?: string;
+    targetBalance?: string;
+  }) {
+    const body: Record<string, unknown> = { action: "intent" };
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      intentId: string;
+      typedData: Record<string, unknown>;
+      validUntil: string;
+      preflight: Record<string, unknown>;
+    }>("/agent/vault/deposit", { method: "POST", body });
+  }
+
+  async vaultDepositRelay(params: {
+    intentId: string;
+    auto_sign?: boolean;
+    signature?: string;
+  }) {
+    const body: Record<string, unknown> = { action: "relay" };
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      intentId: string;
+      status: string;
+      txHash?: string;
+      amount: string;
+      nextNonce?: string;
+      error: string | null;
+    }>("/agent/vault/deposit", { method: "POST", body });
+  }
+
+  async vaultWithdrawInfo() {
+    return this.request<{
+      vaultBalance: string;
+      walletBalance: string;
+      autoSignSupported: boolean;
+      recentWithdrawals: Array<{
+        id: string;
+        amount: string;
+        destination: string;
+        status: string;
+        txHash?: string;
+        createdAt: string;
+      }>;
+    }>("/agent/vault/withdraw");
+  }
+
+  async vaultWithdrawIntent(params: {
+    amount?: string;
+    targetBalance?: string;
+  }) {
+    const body: Record<string, unknown> = { action: "intent" };
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      intentId: string;
+      transaction: { to: string; data: string; value: string; chainId: number };
+      validUntil: string;
+      preflight: Record<string, unknown>;
+    }>("/agent/vault/withdraw", { method: "POST", body });
+  }
+
+  async vaultWithdrawRelay(params: {
+    intentId: string;
+    signedTransaction: string;
+  }) {
+    return this.request<{
+      intentId: string;
+      status: string;
+      txHash?: string;
+      amount: string;
+      error: string | null;
+    }>("/agent/vault/withdraw", {
+      method: "POST",
+      body: { action: "relay", ...params },
+    });
+  }
+
+  // --- Redeem ---
+
+  async redeemPositions(conditionIds: string[]) {
+    const body: Record<string, unknown> =
+      conditionIds.length === 1
+        ? { conditionId: conditionIds[0] }
+        : { conditionIds };
+    return this.request<Record<string, unknown>>(
+      "/agent/portfolio/redeem",
+      { method: "POST", body },
+    );
+  }
+
+  // --- Platform ---
+
+  async getConfig() {
+    return this.request<Record<string, unknown>>("/agent/config");
+  }
+
+  async ping() {
+    return this.request<Record<string, unknown>>("/agent/ping");
+  }
+
+  async getAuditLog(params?: {
+    event_type?: string;
+    since?: string;
+    before?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      entries: Array<{
+        id: string;
+        eventType: string;
+        eventData: Record<string, unknown>;
+        createdAt: string;
+      }>;
+      pagination: {
+        offset: number;
+        limit: number;
+        total: number;
+        hasMore: boolean;
+      };
+    }>("/agent/audit-log", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  async validateMarketParams(params: {
+    title: string;
+    resolutionCriteria: string;
+    resolutionSource: string;
+    resolutionDate?: string;
+    category?: string;
+    description?: string;
+    liquidityTier?: string;
+    initialPriceYesBps?: number;
+    resolveEndAt?: string;
+  }) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<{
+      success: boolean;
+      valid: boolean;
+      issues: Array<{
+        field: string;
+        code: string;
+        message: string;
+        severity: string;
+      }>;
+      duplicateCheck: {
+        hasDuplicates: boolean;
+        similarMarkets: unknown[];
+      };
+      preview: Record<string, unknown>;
+    }>("/agent/markets/validate", { method: "POST", body });
+  }
+
+  async batchGetMarkets(params: {
+    addresses?: string[];
+    conditionIds?: string[];
+  }) {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) body[k] = v;
+    }
+    return this.request<Record<string, unknown>>(
+      "/agent/markets/batch",
+      { method: "POST", body },
+    );
+  }
+
+  async getMarketHistory(
+    address: string,
+    params?: {
+      interval?: string;
+      from?: string;
+      to?: string;
+      includeVolume?: boolean;
+      limit?: number;
+    },
+  ) {
+    return this.request<{ history: unknown[] }>(
+      `/agent/markets/${address}/history`,
+      { query: params as Record<string, string | number | boolean> },
+    );
+  }
+
+  async getTradeHistory(params?: {
+    market?: string;
+    side?: string;
+    source?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    return this.request<{
+      trades: Array<Record<string, unknown>>;
+      pagination: { offset: number; limit: number; total: number };
+    }>("/agent/trade/history", {
+      query: params as Record<string, string | number>,
+    });
+  }
+
+  // --- Webhooks ---
+
+  async createWebhook(params: { url: string; eventTypes: string[] }) {
+    return this.request<{
+      webhook: {
+        id: string;
+        url: string;
+        eventTypes: string[];
+        isActive: boolean;
+        createdAt: string;
+        secret: string;
+      };
+      message: string;
+    }>("/agent/webhooks", {
+      method: "POST",
+      body: params as unknown as Record<string, unknown>,
+    });
+  }
+
+  async listWebhooks() {
+    return this.request<{
+      webhooks: Array<{
+        id: string;
+        url: string;
+        eventTypes: string[];
+        isActive: boolean;
+        createdAt: string;
+        lastDeliveryAt?: string;
+        lastDeliveryStatus?: string;
+        consecutiveFailures: number;
+      }>;
+    }>("/agent/webhooks");
+  }
+
+  async deleteWebhook(id: string) {
+    return this.request<{ success: boolean }>(`/agent/webhooks/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  // --- Public agent profile ---
+
+  async getAgentProfile(agentId: string) {
+    return this.request<Record<string, unknown>>(`/agents/${agentId}`);
   }
 }

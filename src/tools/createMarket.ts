@@ -6,7 +6,9 @@ export const createMarketSchema = z.object({
   title: z
     .string()
     .max(500)
-    .describe("Market question (e.g. 'Will BTC reach $100k by end of 2025?')"),
+    .describe(
+      "Market question (e.g. 'Will BTC reach $100k by end of 2025?'). Maps to the canonical 'question' field in the API.",
+    ),
   resolutionCriteria: z
     .string()
     .max(1000)
