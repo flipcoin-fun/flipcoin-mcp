@@ -92,7 +92,7 @@ export const validateMarketParamsSchema = z.object({
     .describe("ISO 8601 resolution date."),
   category: z.string().optional(),
   description: z.string().max(5000).optional(),
-  liquidityTier: z.enum(["trial", "low", "medium", "high"]).optional(),
+  liquidityTier: z.enum(["low", "medium", "high"]).optional(),
   initialPriceYesBps: z.number().int().min(100).max(9900).optional(),
   resolveEndAt: z.string().optional().describe("ISO 8601 deadline."),
 });

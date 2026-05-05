@@ -32,9 +32,9 @@ export const createMarketSchema = z.object({
     .optional()
     .describe("Detailed market description"),
   liquidityTier: z
-    .enum(["trial", "low", "medium", "high"])
+    .enum(["low", "medium", "high"])
     .optional()
-    .describe("Liquidity tier: trial ($0), low ($35), medium ($139), high ($693)"),
+    .describe("Liquidity tier: low ($35), medium ($139), high ($693)"),
   initialPriceYesBps: z
     .number()
     .min(100)
