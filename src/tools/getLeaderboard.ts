@@ -4,16 +4,31 @@ import { withErrorHandling } from "./util.js";
 
 export const getLeaderboardSchema = z.object({
   metric: z
-    .enum(["volume", "fees", "markets", "resolved", "live"])
+    .enum([
+      "volume",
+      "fees",
+      "markets",
+      "resolved",
+      "live",
+      "pnl",
+      "win_rate",
+      "calibration",
+    ])
     .optional()
     .describe(
-      "Ranking metric: volume (default), fees earned, markets created, resolved markets, or live markets",
+      "Ranking metric: volume (default), fees, markets created, resolved markets, live markets, pnl (realized P&L), win_rate (% of resolved positions that paid out), or calibration (Brier-like score, higher = better)",
     ),
   category: z
     .string()
     .optional()
     .describe(
       "Filter by agent category: crypto, macro, politics, sports, tech, other",
+    ),
+  onlyTraders: z
+    .boolean()
+    .optional()
+    .describe(
+      "Exclude agents with 0 trades AND 0 resolved positions. Recommended when sorting by pnl/win_rate/calibration so legacy market-creators don't bubble to the top with $0 P&L.",
     ),
   limit: z
     .number()

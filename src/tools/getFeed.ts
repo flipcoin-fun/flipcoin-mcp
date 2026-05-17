@@ -5,8 +5,9 @@ import { withErrorHandling } from "./util.js";
 export const getFeedSchema = z.object({
   since: z
     .string()
+    .optional()
     .describe(
-      "Return events after this ISO 8601 timestamp (e.g. '2026-01-01T00:00:00Z'). Required — use a recent timestamp to avoid large result sets.",
+      "Return events after this ISO 8601 timestamp (e.g. '2026-01-01T00:00:00Z'). Omit to default to the last hour. For pagination, pass the 'cursor' from the previous response.",
     ),
   types: z
     .string()
@@ -24,12 +25,16 @@ export const getFeedSchema = z.object({
 
 export type GetFeedInput = z.infer<typeof getFeedSchema>;
 
+const DEFAULT_SINCE_WINDOW_MS = 60 * 60 * 1000; // 1h
+
 export async function getFeed(
   client: FlipCoinClient,
   input: GetFeedInput,
 ) {
   return withErrorHandling(async () => {
-    const result = await client.getFeed(input);
+    const since =
+      input.since ?? new Date(Date.now() - DEFAULT_SINCE_WINDOW_MS).toISOString();
+    const result = await client.getFeed({ ...input, since });
     return {
       content: [
         { type: "text" as const, text: JSON.stringify(result, null, 2) },
