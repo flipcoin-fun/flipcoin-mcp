@@ -144,7 +144,7 @@ function registerTools(server: McpServer, flipClient: FlipCoinClient) {
 
   server.tool(
     "get_feed",
-    "Get activity feed of platform events. Filter by type: 'market_created' (new markets), 'trade' (executed trades), 'market_resolved' (final outcomes), 'resolution_proposed' (markets entering 24h dispute period). Returns events with timestamps and market-specific payload. Use cursor-based pagination — pass the returned 'cursor' as 'since' in the next call.",
+    "Get activity feed of platform events. Filter by type: 'market_created' (new markets), 'trade' (executed trades), 'market_resolved' (final outcomes), 'resolution_proposed' (markets entering 24h dispute period). Returns events with timestamps and market-specific payload. `since` is optional — defaults to the last hour. For pagination, pass the returned 'cursor' as 'since' in the next call.",
     getFeedSchema.shape,
     (input) => getFeed(flipClient, input),
   );
@@ -179,7 +179,7 @@ function registerTools(server: McpServer, flipClient: FlipCoinClient) {
 
   server.tool(
     "get_leaderboard",
-    "View the public agent leaderboard. See how agents rank by volume, fees earned, markets created, resolved markets, or live markets. Filter by category (crypto, macro, politics, sports, tech). Returns rank, agent name, volume, fees, and market counts. USDC amounts are in base units (6 decimals: 1000000 = $1).",
+    "View the public agent leaderboard. Rank by volume (default), fees, markets created, resolved markets, live markets, pnl (realized P&L), win_rate, or calibration. Filter by category (crypto, macro, politics, sports, tech). Pass onlyTraders=true with pnl/win_rate/calibration to skip legacy market-creators with no trades. Returns rank, agent name, volume, fees, and market counts. USDC amounts are in base units (6 decimals: 1000000 = $1).",
     getLeaderboardSchema.shape,
     (input) => getLeaderboard(flipClient, input),
   );
@@ -362,7 +362,7 @@ async function main() {
 
   if (!port) {
     // Default: stdio mode (existing behavior, unchanged)
-    const server = new McpServer({ name: "flipcoin", version: "0.1.0" });
+    const server = new McpServer({ name: "flipcoin", version: "0.2.0" });
     registerTools(server, client);
     const transport = new StdioServerTransport();
     await server.connect(transport);
@@ -397,7 +397,7 @@ async function main() {
   const httpTransport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless mode
   });
-  const httpServer = new McpServer({ name: "flipcoin", version: "0.1.0" });
+  const httpServer = new McpServer({ name: "flipcoin", version: "0.2.0" });
   registerTools(httpServer, client);
   await httpServer.connect(httpTransport);
 
@@ -416,7 +416,7 @@ async function main() {
       sseTransports.delete(transport.sessionId);
     });
 
-    const sseServer = new McpServer({ name: "flipcoin", version: "0.1.0" });
+    const sseServer = new McpServer({ name: "flipcoin", version: "0.2.0" });
     registerTools(sseServer, client);
     await sseServer.connect(transport);
   });
