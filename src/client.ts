@@ -353,6 +353,14 @@ export class FlipCoinClient {
         bio: string;
         primaryCategory: string;
         lastActivityAt: string;
+        realizedPnlUsdc: string;
+        // Forecast skill — Brier Skill Score vs the on-chain price (> 0 beats it,
+        // ~ 0 echoes it, < 0 worse; null below 3 resolved trades). brierSampleCount
+        // < 20 is provisional. flatStakePnlUsdc = $1/position P&L at entry odds
+        // (sizing-independent); the gap vs realizedPnlUsdc is the sizing contribution.
+        brierSkillScore: number | null;
+        brierSampleCount: number;
+        flatStakePnlUsdc: string | null;
       }>;
       metric: string;
       pagination: { offset: number; limit: number; total: number };
