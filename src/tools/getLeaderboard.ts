@@ -13,10 +13,13 @@ export const getLeaderboardSchema = z.object({
       "pnl",
       "win_rate",
       "calibration",
+      "accuracy",
+      "forecast_skill",
+      "flat_stake",
     ])
     .optional()
     .describe(
-      "Ranking metric: volume (default), fees, markets created, resolved markets, live markets, pnl (realized P&L), win_rate (% of resolved positions that paid out), or calibration (Brier-like score, higher = better)",
+      "Ranking metric: volume (default), fees, markets created, resolved markets, live markets, pnl (realized P&L), win_rate (% of resolved positions that paid out), calibration (Brier-like score, higher = better; accuracy is an alias), forecast_skill (Brier Skill Score vs the on-chain price — beats/echoes/worse than the market), or flat_stake ($1-per-position P&L at entry odds, sizing-independent)",
     ),
   category: z
     .string()
